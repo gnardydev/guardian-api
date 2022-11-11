@@ -1,18 +1,18 @@
 //Biblioteca do Arduino
 var five = require("johnny-five");
 var { Board, Servo, Proximity, Sensor } = require("johnny-five");
-// var board = new five.Board();
 
+//Definir Placa do arduino a serem utilizadas
 const board = new Board(
   {
     port: "Com3"
-});
-
+  });
 
 
 //Requisições da API
 const { application } = require("express");
 const express = require("express");
+const { response } = require("../app");
 const router = express.Router();
 
 const app = express();
@@ -21,83 +21,91 @@ app.use(express.json());
 
 board.on("ready", () => {
 
-  app.get("/microfone", function (req, res){
-  
+  //Definir end point de requisição
+  app.get("/microfone", function (req, res) {
 
-    var response = {
-        device:"microfone",
-        data:"MuchNoise"
-      }
-    
+    //Definir Porta
     var mic = new Sensor(2);
-    var value = 0;
 
-    // console.log(mic.value);
-  
-    mic.on("data", ()=>{  
-      value = mic.value;
-      console.log(mic.value);
+    //Ativar Microfone
+    mic.enable();
 
-      response.device = "microfone";
-      response.data = "MuchNoise";
+    mic.on("data", () => {
 
-      board.disconnect();
+      //Verificar valor dos decibeis detectados
+      if (mic.value > 40) {
+
+        res.json({
+          device: "microfone",
+          data: "MuchNoise"
+        });
+        mic.disable();
+
+      }
+      else {
+
+        res.json({
+          device: "microfone",
+          data: "LowNoise"
+        });
+        mic.disable();
+      }
+
+
     });
 
-
-    res.json(response);
-    
-  
   });
-  
 
+  //Definir end point de requisição
   app.get("/sensorMove", function (req, res) {
-
+    //Definir Porta e especificar dispositivo
     const proximity = new Proximity({
       controller: "HCSR04",
       pin: 9
     });
 
-    console.log("não passou no proximity");
+    proximity.within([1, 1000], "cm", function () {
 
-    proximity.on("change", () => {
 
-      // console.log("pasosu no proximity");
-
+      //Salvar centimentros do objeto
       const { centimeters } = proximity;
-      //Create a new `motion` hardware instance.
 
-      console.log(centimeters);
-      // res.json({
-      //   device: "sensorMove",
-      //   data: centimeters
-      // })
+      res.json({
+        device: "sensorMove",
+        data: "moveDetected"
+      });
 
     });
 
+
+    res.json({
+      device: "sensorMove",
+      data: "moveNotDetected"
+    });
+
+
   });
 
+  //Definir end point de requisição
   app.post("/servoMotor", (req, res) => {
 
-    //trancar porta
+    //Definir Porta
     const servo = new Servo.Continuous({
       pin: 6
     });
 
+    //Verificar usuar5io da requisição
     if (req.body.ip === "admin") {
+      //Indentificar Requisição
       if (req.body.data === "false") {
-        console.log("teste")
         //Destrancar Porta
         servo.cw();
-        // servo.stop();
-
         console.log("Porta Destrancada");
+
       } else {
         if (req.body.data === "true") {
           //Trancar Porta
           servo.ccw();
-          // servo.stop();
-
           console.log("Porta Trancada");
         }
       }
@@ -111,7 +119,7 @@ board.on("ready", () => {
 //
 
 app.listen(8000, () => {
-  console.log("Servidor rodadno na url http://localhost:8081");
+  console.log("Servidor rodadno na url http://localhost:8000");
 });
 
 module.exports = router;
